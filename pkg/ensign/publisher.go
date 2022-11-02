@@ -13,6 +13,8 @@ type Publisher struct {
 	stream api.Publisher
 }
 
+var _ message.Publisher = &Publisher{}
+
 func (p Publisher) Publish(topic string, messages ...*message.Message) (err error) {
 	if p.stream == nil {
 		if p.stream, err = p.client.Publish(context.Background()); err != nil {

@@ -13,6 +13,9 @@ type Subscriber struct {
 	stream api.Subscriber
 }
 
+var _ message.Subscriber = &Subscriber{}
+var _ message.SubscribeInitializer = &Subscriber{}
+
 var (
 	ErrEmptyTopic = errors.New("topic is not specified")
 )
