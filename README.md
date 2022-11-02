@@ -1,7 +1,7 @@
-# Watermill Ensign Pub/Sub
+# Watermill Ensign Pub/Sub [![CI](https://github.com/rotationalio/watermill-ensign/workflows/CI/badge.svg)][actions] [![godocs.io](https://godocs.io/github.com/rotationalio/watermill-ensign?status.svg)][godoc] [![Go Reference](https://pkg.go.dev/badge/github.com/rotationalio/watermill-ensign.svg)][goreference]
 <img align="right" width="200" src="https://threedots.tech/watermill-io/watermill-logo.png">
 
-This is a Pub/Sub for the [Watermill][watermill] project which uses the [Ensign][ensign] database.
+This is a Pub/Sub for the [Watermill][watermill] project which uses the [Ensign][ensign] eventing system.
 
 All Pub/Sub implementations can be found at [https://watermill.io/pubsubs/](https://watermill.io/pubsubs/).
 
@@ -28,7 +28,7 @@ Since no external dependencies are needed to run the tests it should be enough
 to execute the following command:
 
 ```
-$ go test ./...
+$ make test
 ```
 
 ## License
