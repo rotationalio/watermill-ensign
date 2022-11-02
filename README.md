@@ -1,6 +1,3 @@
-# watermill-ensign
-Ensign Pub/Sub for the Watermill project.
-
 # Watermill Ensign Pub/Sub
 <img align="right" width="200" src="https://threedots.tech/watermill-io/watermill-logo.png">
 
@@ -31,7 +28,7 @@ Since no external dependencies are needed to run the tests it should be enough
 to execute the following command:
 
 ```
-$ make test
+$ go test ./...
 ```
 
 ## License
