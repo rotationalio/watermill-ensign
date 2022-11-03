@@ -20,11 +20,12 @@ func TestEnsignMarshaler(t *testing.T) {
 	require.NoError(t, err, "could not marshal test payload")
 
 	// Create a message to marshal
-	msg := message.NewMessage(uuid.NewString(), payload)
+	msg := message.NewMessage("8e9c2625-c7fd-49fd-8cee-e7b92213b368", payload)
 	msg.Metadata = make(message.Metadata)
 	msg.Metadata.Set(ensign.MIMEKey, "application/json")
 	msg.Metadata.Set(ensign.TypeNameKey, "TestEvent")
 	msg.Metadata.Set(ensign.TypeVersionKey, "3")
+	msg.Metadata.Set(ensign.KeyKey, "partition1")
 	msg.Metadata.Set(ensign.EncAlgKey, "AES-GCM")
 	msg.Metadata.Set(ensign.EncKeyIDKey, "676c64a5-44f0-4e11-a8a7-52fdb30b4caa")
 	msg.Metadata.Set(ensign.CompressAlgKey, "gzip")
@@ -49,7 +50,7 @@ func TestInvalidMarshaler(t *testing.T) {
 
 	t.Run("ReservedKey", func(t *testing.T) {
 		reserved := []string{
-			ensign.IDKey, ensign.TopicIDKey, ensign.CommittedKey,
+			ensign.IDKey, ensign.TopicIDKey, ensign.CommittedKey, ensign.UUIDKey,
 		}
 
 		for _, reskey := range reserved {
@@ -105,6 +106,7 @@ func TestEnsignUnmarshaler(t *testing.T) {
 	payload, err := json.Marshal(map[string]interface{}{"color": "red", "age": 42})
 	require.NoError(t, err, "could not marshal test payload")
 	require.True(t, bytes.Equal(msg.Payload, payload), "fixture payload does not match unmarshaled payload")
+	require.Equal(t, "8e9c2625-c7fd-49fd-8cee-e7b92213b368", msg.UUID, "watermill id not stored")
 
 	requireMeta := func(key, value string) {
 		require.Contains(t, msg.Metadata, key, "metadata is missing expected key")
@@ -116,6 +118,7 @@ func TestEnsignUnmarshaler(t *testing.T) {
 	requireMeta(ensign.MIMEKey, "application/json")
 	requireMeta(ensign.TypeNameKey, "TestEvent")
 	requireMeta(ensign.TypeVersionKey, "3")
+	requireMeta(ensign.KeyKey, "partition1")
 	requireMeta(ensign.EncAlgKey, "AES-GCM")
 	requireMeta(ensign.EncKeyIDKey, "676c64a5-44f0-4e11-a8a7-52fdb30b4caa")
 	requireMeta(ensign.CompressAlgKey, "gzip")

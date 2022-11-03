@@ -6,6 +6,7 @@
     "name":  "TestEvent",
     "version":  3
   },
+  "key": "cGFydGl0aW9uMQ==",
   "data":  "eyJhZ2UiOjQyLCJjb2xvciI6InJlZCJ9",
   "encryption":  {
     "algorithm":  "AES-GCM",
@@ -21,6 +22,7 @@
     "client_id":  "1234abcdef",
     "ipaddr":  "127.0.0.1"
   },
+  "user_defined_id": "8e9c2625-c7fd-49fd-8cee-e7b92213b368",
   "created":  "2022-11-02T22:21:39.804188Z",
   "committed":  null
 }

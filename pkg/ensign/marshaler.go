@@ -19,22 +19,24 @@ const (
 	MIMEKey        = "mimetype"
 	TypeNameKey    = "type_name"
 	TypeVersionKey = "type_version"
+	KeyKey         = "key"
 	EncAlgKey      = "encryption_algorithm"
 	EncKeyIDKey    = "encryption_key_id"
 	CompressAlgKey = "compression_algorithm"
 	RegionNameKey  = "region_name"
 	PubClientIDKey = "publisher_client_id"
 	PubIPAddrKey   = "publisher_ipaddr"
+	UUIDKey        = "user_defined_id"
 	CreatedKey     = "created"
 	CommittedKey   = "committed"
 )
 
 // The number of metadata keys available in Ensign (to alloc metadata)
-const nEnsignKeys = 13
+const nEnsignKeys = 15
 
 // Reserved metadata keys that cannot be in a message for serialization.
 var reserved = []string{
-	IDKey, TopicIDKey, CommittedKey,
+	IDKey, TopicIDKey, CommittedKey, UUIDKey,
 }
 
 // Marshaler transforms a Waterfall Message into an Ensign client library Event.
@@ -71,9 +73,14 @@ func (e EventMarshaler) Marshal(topic string, msg *message.Message) (event *pb.E
 	}
 
 	// TODO: how to add topic ID to the event from the topic string (or validate it)?
-	// TODO: add watermill key to the event
 	event = &pb.Event{
-		Data: msg.Payload,
+		Data:          msg.Payload,
+		UserDefinedId: msg.UUID,
+	}
+
+	if value := msg.Metadata.Get(KeyKey); value != "" {
+		// TODO: should we add base64 encoding/decoding to the key?
+		event.Key = []byte(value)
 	}
 
 	if value := msg.Metadata.Get(MIMEKey); value != "" {
@@ -140,6 +147,11 @@ func (e EventMarshaler) Unmarshal(event *pb.Event) (*message.Message, error) {
 	metadata.Set(TopicIDKey, event.TopicId)
 	metadata.Set(MIMEKey, event.Mimetype.MimeType())
 
+	if event.Key != nil {
+		// TODO: should we add base64 encoding to the key?
+		metadata.Set(KeyKey, string(event.Key))
+	}
+
 	if event.Type != nil {
 		metadata.Set(TypeNameKey, event.Type.Name)
 		metadata.Set(TypeVersionKey, strconv.FormatUint(uint64(event.Type.Version), 10))
@@ -171,8 +183,7 @@ func (e EventMarshaler) Unmarshal(event *pb.Event) (*message.Message, error) {
 		metadata.Set(CommittedKey, event.Committed.AsTime().Format(time.RFC3339Nano))
 	}
 
-	// TODO: fetch user defined id from ensign event
-	msg := message.NewMessage("", event.Data)
+	msg := message.NewMessage(event.UserDefinedId, event.Data)
 	msg.Metadata = metadata
 
 	return msg, nil

@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/ThreeDotsLabs/watermill v1.1.1
 	github.com/google/uuid v1.3.0
-	github.com/rotationalio/ensign v0.1.1-0.20221102154016-105214c00cc4
+	github.com/rotationalio/ensign v0.1.1-0.20221103134230-692ede304e52
 	github.com/stretchr/testify v1.8.0
 	google.golang.org/protobuf v1.28.1
 )
