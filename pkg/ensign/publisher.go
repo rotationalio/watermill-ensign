@@ -12,9 +12,10 @@ import (
 
 type Publisher struct {
 	config PublisherConfig
+	logger watermill.LoggerAdapter
+
 	client *ensign.Client
 	stream ensign.Publisher
-	logger watermill.LoggerAdapter
 }
 
 var _ message.Publisher = &Publisher{}
