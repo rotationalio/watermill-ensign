@@ -84,8 +84,9 @@ func NewSubscriber(config SubscriberConfig, logger watermill.LoggerAdapter) (sub
 	}
 
 	sub = &Subscriber{
-		config: config,
-		client: config.Client,
+		config:  config,
+		client:  config.Client,
+		closing: make(chan struct{}),
 	}
 
 	if sub.client == nil {

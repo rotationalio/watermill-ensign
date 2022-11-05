@@ -2,6 +2,7 @@ package ensign
 
 import (
 	"context"
+	"sync"
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -11,6 +12,8 @@ import (
 )
 
 type Publisher struct {
+	sync.RWMutex
+
 	config PublisherConfig
 	logger watermill.LoggerAdapter
 
@@ -68,6 +71,10 @@ func NewPublisher(config PublisherConfig, logger watermill.LoggerAdapter) (pub *
 		}
 	}
 
+	if pub.stream, err = pub.client.Publish(context.Background()); err != nil {
+		return nil, errors.Wrap(err, "cannot connect to topic stream")
+	}
+
 	if pub.logger == nil {
 		pub.logger = watermill.NopLogger{}
 	}
@@ -77,15 +84,12 @@ func NewPublisher(config PublisherConfig, logger watermill.LoggerAdapter) (pub *
 
 // Publish messsages to Ensign.
 // TODO: publisher should not return an until an ack has been received from Ensign.
-func (p Publisher) Publish(topic string, messages ...*message.Message) (err error) {
+func (p *Publisher) Publish(topic string, messages ...*message.Message) (err error) {
+	p.RLock()
+	defer p.RUnlock()
+
 	if p.client == nil {
 		return ErrPublisherClosed
-	}
-
-	if p.stream == nil {
-		if p.stream, err = p.client.Publish(context.Background()); err != nil {
-			return errors.Wrapf(err, "cannot connect to topic stream %s", topic)
-		}
 	}
 
 	logFields := make(watermill.LogFields, 4)
@@ -108,7 +112,10 @@ func (p Publisher) Publish(topic string, messages ...*message.Message) (err erro
 	return nil
 }
 
-func (p Publisher) Close() (err error) {
+func (p *Publisher) Close() (err error) {
+	p.Lock()
+	defer p.Unlock()
+
 	if p.client == nil {
 		return nil
 	}
