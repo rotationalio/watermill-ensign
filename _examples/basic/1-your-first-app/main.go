@@ -10,7 +10,6 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
 	"github.com/ThreeDotsLabs/watermill/message/router/plugin"
-	api "github.com/rotationalio/ensign/sdks/go"
 	"github.com/rotationalio/watermill-ensign/pkg/ensign"
 )
 
@@ -96,10 +95,6 @@ func createPublisher() message.Publisher {
 	ensignPublisher, err := ensign.NewPublisher(
 		ensign.PublisherConfig{
 			Marshaler: marshaler,
-			EnsignConfig: &api.Options{
-				Endpoint: "localhost:3333",
-				Insecure: true,
-			},
 		},
 		logger,
 	)

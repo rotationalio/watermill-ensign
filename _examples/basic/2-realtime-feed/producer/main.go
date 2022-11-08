@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/brianvoe/gofakeit"
-	api "github.com/rotationalio/ensign/sdks/go"
 	"github.com/rotationalio/watermill-ensign/pkg/ensign"
 
 	"github.com/ThreeDotsLabs/watermill"
@@ -33,10 +32,6 @@ func main() {
 	publisher, err := ensign.NewPublisher(
 		ensign.PublisherConfig{
 			Marshaler: marshaler,
-			EnsignConfig: &api.Options{
-				Endpoint: "localhost:3333",
-				Insecure: true,
-			},
 		},
 		logger,
 	)
