@@ -206,6 +206,11 @@ func (s handler) process(ctx context.Context, event *api.Event) {
 		return
 	}
 
+	if err := s.stream.Err(); err != nil {
+		s.sub.logger.Error("ensign subscription stream errored", err, s.logFields)
+		return
+	}
+
 	s.sub.processingMessagesWg.Add(1)
 	defer s.sub.processingMessagesWg.Done()
 

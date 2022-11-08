@@ -6,7 +6,7 @@ require (
 	github.com/ThreeDotsLabs/watermill v1.1.1
 	github.com/google/uuid v1.3.0
 	github.com/pkg/errors v0.8.1
-	github.com/rotationalio/ensign v0.1.1-0.20221105203241-2ad3dbe09a9e
+	github.com/rotationalio/ensign v0.1.1
 	github.com/stretchr/testify v1.8.0
 	google.golang.org/protobuf v1.28.1
 )
