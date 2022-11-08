@@ -12,7 +12,7 @@ import (
 
 func TestPublishSubscribe(t *testing.T) {
 	// This test is not quite working yet
-	t.Skip("not quite working yet")
+	// t.Skip("not quite working yet")
 
 	tests.TestPubSub(
 		t,
