@@ -1,6 +1,7 @@
 package ensign_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/ThreeDotsLabs/watermill"
@@ -12,7 +13,9 @@ import (
 
 func TestPublishSubscribe(t *testing.T) {
 	// This test is not quite working yet
-	t.Skip("seems to be working but takes forever to run")
+	if runtest := os.Getenv("ENSIGN_LIVE_TESTS"); runtest == "" {
+		t.Skip("seems to be working but takes forever to run")
+	}
 
 	tests.TestPubSub(
 		t,
