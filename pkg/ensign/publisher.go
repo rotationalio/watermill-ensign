@@ -104,8 +104,15 @@ func (p *Publisher) Publish(topic string, messages ...*message.Message) (err err
 			return errors.Wrapf(err, "cannot marshal messages %s", message.UUID)
 		}
 
-		// TODO: wait for ack and log partition and offset
+		// TODO: wait for ack and log partition and offset (requires SDK update).
 		p.stream.Publish(event)
+
+		// NOTE: errors are not synchronous, e.g. this might not be the error for the
+		// currently sent message, it might be an error from a previous message that
+		// was sent. We have to change the Ensign SDK in order to get a sync error.
+		if err = p.stream.Err(); err != nil {
+			return err
+		}
 
 		p.logger.Trace("message sent to Ensign", logFields)
 	}
