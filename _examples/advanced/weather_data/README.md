@@ -1,0 +1,3 @@
+# Weather Data App
+
+This end-to-end example demonstrates how to retrieve and save weather data using Ensign and [Watermill](https://watermill.io). Create a publisher to call the [Weather API](https://www.weatherapi.com) and emit the data to a topic stream and use Watermill's [router](https://watermill.io/docs/messages-router/) and [SQL Pub/Sub](https://watermill.io/pubsubs/sql/) to save the data into a PostgreSQL database.
