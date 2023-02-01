@@ -111,7 +111,7 @@ func createPostgresConnection() *stdSQL.DB {
 }
 
 func createSubscriber(logger watermill.LoggerAdapter) message.Subscriber {
-	sub, err := ensign.NewSubscriber(
+	subscriber, err := ensign.NewSubscriber(
 		ensign.SubscriberConfig{
 			EnsignConfig: &ensign.Options{
 				ClientID:     os.Getenv("ENSIGN_CLIENT_ID"),
@@ -125,7 +125,7 @@ func createSubscriber(logger watermill.LoggerAdapter) message.Subscriber {
 		panic(err)
 	}
 
-	return sub
+	return subscriber
 }
 
 func createPublisher(db *stdSQL.DB) message.Publisher {
