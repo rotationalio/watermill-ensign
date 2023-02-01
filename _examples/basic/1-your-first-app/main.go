@@ -107,7 +107,7 @@ func createPublisher() message.Publisher {
 
 // createSubscriber is a helper function similar to the previous one, but in this case it creates a Subscriber.
 func createSubscriber(consumerGroup string) message.Subscriber {
-	subscriber, err := ensign.NewSubscriber(
+	ensignSubscriber, err := ensign.NewSubscriber(
 		ensign.SubscriberConfig{
 			Unmarshaler: marshaler,
 		},
@@ -117,7 +117,7 @@ func createSubscriber(consumerGroup string) message.Subscriber {
 		panic(err)
 	}
 
-	return subscriber
+	return ensignSubscriber
 }
 
 // simulateEvents produces events that will be later consumed.
