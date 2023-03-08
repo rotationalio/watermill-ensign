@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/ThreeDotsLabs/watermill/message"
-	pb "github.com/rotationalio/ensign/pkg/api/v1beta1"
-	mime "github.com/rotationalio/ensign/pkg/mimetype/v1beta1"
+	pb "github.com/rotationalio/go-ensign/api/v1beta1"
+	mime "github.com/rotationalio/go-ensign/mimetype/v1beta1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
