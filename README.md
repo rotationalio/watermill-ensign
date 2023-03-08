@@ -38,6 +38,7 @@ $ make test
 
 [watermill]: https://watermill.io/
 [ensign]: https://github.com/rotationalio/ensign
+[go-ensign]: https://github.com/rotationalio/go-ensign
 [actions]: https://github.com/rotationalio/watermill-ensign/actions
 [godoc]: http://godocs.io/github.com/rotationalio/watermill-ensign
 [goreference]: https://pkg.go.dev/github.com/rotationalio/watermill-ensign

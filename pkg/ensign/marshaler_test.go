@@ -8,7 +8,7 @@ import (
 
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/google/uuid"
-	pb "github.com/rotationalio/ensign/pkg/api/v1beta1"
+	pb "github.com/rotationalio/go-ensign/api/v1beta1"
 	"github.com/rotationalio/watermill-ensign/pkg/ensign"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protojson"

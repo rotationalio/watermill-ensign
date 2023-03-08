@@ -7,8 +7,8 @@ import (
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/pkg/errors"
-	api "github.com/rotationalio/ensign/pkg/api/v1beta1"
-	ensign "github.com/rotationalio/ensign/sdks/go"
+	ensign "github.com/rotationalio/go-ensign"
+	api "github.com/rotationalio/go-ensign/api/v1beta1"
 )
 
 type Publisher struct {
