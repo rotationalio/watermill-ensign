@@ -105,7 +105,7 @@ func (p *Publisher) Publish(topic string, messages ...*message.Message) (err err
 		}
 
 		// TODO: wait for ack and log partition and offset (requires SDK update).
-		p.stream.Publish(event)
+		p.stream.Publish(topic, event)
 
 		// NOTE: errors are not synchronous, e.g. this might not be the error for the
 		// currently sent message, it might be an error from a previous message that
