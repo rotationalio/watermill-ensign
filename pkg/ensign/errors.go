@@ -4,6 +4,7 @@ import "errors"
 
 var (
 	ErrEmptyTopic         = errors.New("topic is not specified")
+	ErrTopicNotFound      = errors.New("topic does not exist")
 	ErrPublisherClosed    = errors.New("publisher is closed")
 	ErrSubscriberClosed   = errors.New("subscriber is closed")
 	ErrMissingMarshaler   = errors.New("invalid config: missing marshaler")

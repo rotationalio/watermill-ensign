@@ -23,6 +23,7 @@ type Subscriber struct {
 	client  *ensign.Client
 	subs    []handler
 	closing chan struct{}
+	topicID string
 
 	outputsWg            sync.WaitGroup
 	processingMessagesWg sync.WaitGroup
@@ -48,6 +49,9 @@ type SubscriberConfig struct {
 	// CloseTimeout determines how long subscriber will wait for Ack/Nack on close.
 	// When no Ack/Nack is received after CloseTimeout, subscriber will be closed.
 	CloseTimeout time.Duration
+
+	// Create the topic if it doesn't exist when subscribing
+	EnsureCreateTopic bool
 }
 
 func (c *SubscriberConfig) setDefaults() {
@@ -105,14 +109,44 @@ func NewSubscriber(config SubscriberConfig, logger watermill.LoggerAdapter) (sub
 // SubscribeInitialize satisfies one of Watermill's interfaces. It is not
 // necessary to manually call it. The same initialization performed by this
 // function is performed by subscribe.
-func (s *Subscriber) SubscribeInitialize(topic string) error {
-	// TODO: implement
+func (s *Subscriber) SubscribeInitialize(topic string) (err error) {
+	if topic == "" {
+		return ErrEmptyTopic
+	}
+
+	// Check if the topic exists
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var exists bool
+	if exists, err = s.client.TopicExists(ctx, topic); err != nil {
+		return err
+	}
+
+	if !exists {
+		if s.config.EnsureCreateTopic {
+			if s.topicID, err = s.client.CreateTopic(ctx, topic); err != nil {
+				return err
+			}
+			return nil
+		}
+		return ErrTopicNotFound
+	} else {
+		if s.topicID, err = s.client.TopicID(ctx, topic); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
+// Subscribe to topic.
 func (s *Subscriber) Subscribe(ctx context.Context, topic string) (_ <-chan *message.Message, err error) {
-	if topic == "" {
-		return nil, ErrEmptyTopic
+	if s.topicID == "" {
+		// TODO: this shouldn't happen right?
+		// TODO: use topic cache rather than fetching topic ID each time.
+		if err = s.SubscribeInitialize(topic); err != nil {
+			return nil, err
+		}
 	}
 
 	output := make(chan *message.Message)
@@ -124,7 +158,7 @@ func (s *Subscriber) Subscribe(ctx context.Context, topic string) (_ <-chan *mes
 		},
 	}
 
-	if handler.stream, err = s.client.Subscribe(ctx); err != nil {
+	if handler.stream, err = s.client.Subscribe(ctx, s.topicID); err != nil {
 		return nil, errors.Wrapf(err, "cannot subscribe to topic %q", err)
 	}
 
