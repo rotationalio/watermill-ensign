@@ -50,7 +50,7 @@ type SubscriberConfig struct {
 	// When no Ack/Nack is received after CloseTimeout, subscriber will be closed.
 	CloseTimeout time.Duration
 
-	// Create the topic if it doesn't exist when subscribing
+	// Create the topic if it doesn't exist when subscribing (default false).
 	EnsureCreateTopic bool
 }
 
