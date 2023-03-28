@@ -109,3 +109,8 @@ func (t *TopicCache) Clear() {
 		delete(t.topics, key)
 	}
 }
+
+// Length returns the number of items in the cache
+func (t *TopicCache) Length() int {
+	return len(t.topics)
+}
