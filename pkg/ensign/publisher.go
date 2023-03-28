@@ -19,6 +19,7 @@ type Publisher struct {
 
 	client *ensign.Client
 	stream ensign.Publisher
+	topics *TopicCache
 }
 
 var _ message.Publisher = &Publisher{}
@@ -33,6 +34,9 @@ type PublisherConfig struct {
 
 	// Marshaler is used to convert messages into Ensign events
 	Marshaler Marshaler
+
+	// Create the topic if it doesn't exist when publishing (default false).
+	EnsureCreateTopic bool
 }
 
 func (c *PublisherConfig) setDefaults() {
@@ -71,6 +75,8 @@ func NewPublisher(config PublisherConfig, logger watermill.LoggerAdapter) (pub *
 		}
 	}
 
+	pub.topics = NewTopicCache(pub.client)
+
 	if pub.stream, err = pub.client.Publish(context.Background()); err != nil {
 		return nil, errors.Wrap(err, "cannot connect to topic stream")
 	}
@@ -92,8 +98,15 @@ func (p *Publisher) Publish(topic string, messages ...*message.Message) (err err
 		return ErrPublisherClosed
 	}
 
+	// Get the topicID from the topics cache
+	var topicID string
+	if topicID, err = p.TopicID(topic); err != nil {
+		return err
+	}
+
 	logFields := make(watermill.LogFields, 4)
 	logFields["topic"] = topic
+	logFields["topicID"] = topicID
 
 	for _, message := range messages {
 		logFields["message_uuid"] = message.UUID
@@ -105,7 +118,7 @@ func (p *Publisher) Publish(topic string, messages ...*message.Message) (err err
 		}
 
 		// TODO: wait for ack and log partition and offset (requires SDK update).
-		p.stream.Publish(topic, event)
+		p.stream.Publish(topicID, event)
 
 		// NOTE: errors are not synchronous, e.g. this might not be the error for the
 		// currently sent message, it might be an error from a previous message that
@@ -140,4 +153,11 @@ func (p *Publisher) Close() (err error) {
 		return errors.Wrap(err, "cannot close ensign client")
 	}
 	return nil
+}
+
+func (p *Publisher) TopicID(topic string) (topicID string, err error) {
+	if p.config.EnsureCreateTopic {
+		return p.topics.Ensure(topic)
+	}
+	return p.topics.Get(topic)
 }

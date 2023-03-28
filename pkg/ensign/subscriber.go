@@ -23,7 +23,7 @@ type Subscriber struct {
 	client  *ensign.Client
 	subs    []handler
 	closing chan struct{}
-	topicID string
+	topics  *TopicCache
 
 	outputsWg            sync.WaitGroup
 	processingMessagesWg sync.WaitGroup
@@ -99,6 +99,8 @@ func NewSubscriber(config SubscriberConfig, logger watermill.LoggerAdapter) (sub
 		}
 	}
 
+	sub.topics = NewTopicCache(sub.client)
+
 	if sub.logger == nil {
 		sub.logger = watermill.NopLogger{}
 	}
@@ -113,40 +115,14 @@ func (s *Subscriber) SubscribeInitialize(topic string) (err error) {
 	if topic == "" {
 		return ErrEmptyTopic
 	}
-
-	// Check if the topic exists
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	var exists bool
-	if exists, err = s.client.TopicExists(ctx, topic); err != nil {
-		return err
-	}
-
-	if !exists {
-		if s.config.EnsureCreateTopic {
-			if s.topicID, err = s.client.CreateTopic(ctx, topic); err != nil {
-				return err
-			}
-			return nil
-		}
-		return ErrTopicNotFound
-	} else {
-		if s.topicID, err = s.client.TopicID(ctx, topic); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
 // Subscribe to topic.
 func (s *Subscriber) Subscribe(ctx context.Context, topic string) (_ <-chan *message.Message, err error) {
-	if s.topicID == "" {
-		// TODO: this shouldn't happen right?
-		// TODO: use topic cache rather than fetching topic ID each time.
-		if err = s.SubscribeInitialize(topic); err != nil {
-			return nil, err
-		}
+	var topicID string
+	if topicID, err = s.TopicID(topic); err != nil {
+		return nil, err
 	}
 
 	output := make(chan *message.Message)
@@ -154,11 +130,12 @@ func (s *Subscriber) Subscribe(ctx context.Context, topic string) (_ <-chan *mes
 		sub:  s,
 		outc: output,
 		logFields: watermill.LogFields{
-			"topic": topic,
+			"topic":   topic,
+			"topicID": topicID,
 		},
 	}
 
-	if handler.stream, err = s.client.Subscribe(ctx, s.topicID); err != nil {
+	if handler.stream, err = s.client.Subscribe(ctx, topicID); err != nil {
 		return nil, errors.Wrapf(err, "cannot subscribe to topic %q", err)
 	}
 
@@ -205,6 +182,13 @@ func (s *Subscriber) isClosed() bool {
 	s.RLock()
 	defer s.RUnlock()
 	return s.client == nil
+}
+
+func (s *Subscriber) TopicID(topic string) (topicID string, err error) {
+	if s.config.EnsureCreateTopic {
+		return s.topics.Ensure(topic)
+	}
+	return s.topics.Get(topic)
 }
 
 type handler struct {
