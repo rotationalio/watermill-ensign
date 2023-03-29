@@ -2,7 +2,10 @@ package ensign
 
 import (
 	"context"
+	"errors"
 	"time"
+
+	sdk "github.com/rotationalio/go-ensign"
 )
 
 const DefaultTimeout = 15 * time.Second
@@ -39,6 +42,9 @@ func (t *TopicCache) Get(topic string) (topicID string, err error) {
 		defer cancel()
 
 		if topicID, err = t.client.TopicID(ctx, topic); err != nil {
+			if errors.Is(err, sdk.ErrTopicNameNotFound) {
+				return "", ErrTopicNotFound
+			}
 			return "", err
 		}
 
