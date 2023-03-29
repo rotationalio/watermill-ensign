@@ -27,6 +27,8 @@ var _ message.Publisher = &Publisher{}
 
 type PublisherConfig struct {
 	// Ensign config is used to overwrite the Ensign connection configuration
+	// Supply Ensign API Key credentials directly in this configuration or set the
+	// $ENSIGN_CLIENT_ID and $ENSIGN_CLIENT_SECRET environment variables.
 	EnsignConfig *ensign.Options
 
 	// Specify a client directly rather than connecting via the config
@@ -44,6 +46,10 @@ func (c *PublisherConfig) setDefaults() {
 	if c.Marshaler == nil {
 		c.Marshaler = EventMarshaler{}
 	}
+
+	if c.EnsignConfig == nil && c.Client == nil {
+		c.EnsignConfig = ensign.NewOptions()
+	}
 }
 
 func (c PublisherConfig) Validate() error {
@@ -53,6 +59,12 @@ func (c PublisherConfig) Validate() error {
 
 	if c.EnsignConfig != nil && c.Client != nil {
 		return ErrAmbiguousConfig
+	}
+
+	if c.EnsignConfig != nil {
+		if c.EnsignConfig.ClientID == "" || c.EnsignConfig.ClientSecret == "" {
+			return ErrMissingCredentials
+		}
 	}
 
 	return nil
