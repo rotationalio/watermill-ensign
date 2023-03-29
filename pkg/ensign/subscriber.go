@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	ensign "github.com/rotationalio/go-ensign"
 	api "github.com/rotationalio/go-ensign/api/v1beta1"
+	"github.com/rotationalio/go-ensign/topics"
 
 	internalSync "github.com/ThreeDotsLabs/watermill/pubsub/sync"
 )
@@ -23,7 +24,7 @@ type Subscriber struct {
 	client  *ensign.Client
 	subs    []handler
 	closing chan struct{}
-	topics  *TopicCache
+	topics  *topics.Cache
 
 	outputsWg            sync.WaitGroup
 	processingMessagesWg sync.WaitGroup
@@ -99,7 +100,7 @@ func NewSubscriber(config SubscriberConfig, logger watermill.LoggerAdapter) (sub
 		}
 	}
 
-	sub.topics = NewTopicCache(sub.client)
+	sub.topics = topics.NewCache(sub.client)
 
 	if sub.logger == nil {
 		sub.logger = watermill.NopLogger{}

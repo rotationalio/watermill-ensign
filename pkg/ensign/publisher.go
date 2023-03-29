@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	ensign "github.com/rotationalio/go-ensign"
 	api "github.com/rotationalio/go-ensign/api/v1beta1"
+	"github.com/rotationalio/go-ensign/topics"
 )
 
 type Publisher struct {
@@ -19,7 +20,7 @@ type Publisher struct {
 
 	client *ensign.Client
 	stream ensign.Publisher
-	topics *TopicCache
+	topics *topics.Cache
 }
 
 var _ message.Publisher = &Publisher{}
@@ -75,7 +76,7 @@ func NewPublisher(config PublisherConfig, logger watermill.LoggerAdapter) (pub *
 		}
 	}
 
-	pub.topics = NewTopicCache(pub.client)
+	pub.topics = topics.NewCache(pub.client)
 
 	if pub.stream, err = pub.client.Publish(context.Background()); err != nil {
 		return nil, errors.Wrap(err, "cannot connect to topic stream")

@@ -6,9 +6,8 @@ require (
 	github.com/ThreeDotsLabs/watermill v1.2.0
 	github.com/google/uuid v1.3.0
 	github.com/pkg/errors v0.9.1
-	github.com/rotationalio/go-ensign v0.5.2-0.20230328134605-ab02572ffa50
+	github.com/rotationalio/go-ensign v0.5.2-0.20230329215109-1db6c9a1ec1c
 	github.com/stretchr/testify v1.8.2
-	google.golang.org/grpc v1.54.0
 	google.golang.org/protobuf v1.30.0
 )
 
@@ -27,5 +26,6 @@ require (
 	golang.org/x/sys v0.6.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
 	google.golang.org/genproto v0.0.0-20230323212658-478b75c54725 // indirect
+	google.golang.org/grpc v1.54.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
