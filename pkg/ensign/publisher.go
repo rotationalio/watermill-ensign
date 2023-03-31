@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	ensign "github.com/rotationalio/go-ensign"
 	api "github.com/rotationalio/go-ensign/api/v1beta1"
+	"github.com/rotationalio/go-ensign/topics"
 )
 
 type Publisher struct {
@@ -19,12 +20,15 @@ type Publisher struct {
 
 	client *ensign.Client
 	stream ensign.Publisher
+	topics *topics.Cache
 }
 
 var _ message.Publisher = &Publisher{}
 
 type PublisherConfig struct {
 	// Ensign config is used to overwrite the Ensign connection configuration
+	// Supply Ensign API Key credentials directly in this configuration or set the
+	// $ENSIGN_CLIENT_ID and $ENSIGN_CLIENT_SECRET environment variables.
 	EnsignConfig *ensign.Options
 
 	// Specify a client directly rather than connecting via the config
@@ -33,11 +37,18 @@ type PublisherConfig struct {
 
 	// Marshaler is used to convert messages into Ensign events
 	Marshaler Marshaler
+
+	// Create the topic if it doesn't exist when publishing (default false).
+	EnsureCreateTopic bool
 }
 
 func (c *PublisherConfig) setDefaults() {
 	if c.Marshaler == nil {
 		c.Marshaler = EventMarshaler{}
+	}
+
+	if c.EnsignConfig == nil && c.Client == nil {
+		c.EnsignConfig = ensign.NewOptions()
 	}
 }
 
@@ -48,6 +59,12 @@ func (c PublisherConfig) Validate() error {
 
 	if c.EnsignConfig != nil && c.Client != nil {
 		return ErrAmbiguousConfig
+	}
+
+	if c.EnsignConfig != nil {
+		if c.EnsignConfig.ClientID == "" || c.EnsignConfig.ClientSecret == "" {
+			return ErrMissingCredentials
+		}
 	}
 
 	return nil
@@ -71,6 +88,8 @@ func NewPublisher(config PublisherConfig, logger watermill.LoggerAdapter) (pub *
 		}
 	}
 
+	pub.topics = topics.NewCache(pub.client)
+
 	if pub.stream, err = pub.client.Publish(context.Background()); err != nil {
 		return nil, errors.Wrap(err, "cannot connect to topic stream")
 	}
@@ -92,8 +111,15 @@ func (p *Publisher) Publish(topic string, messages ...*message.Message) (err err
 		return ErrPublisherClosed
 	}
 
+	// Get the topicID from the topics cache
+	var topicID string
+	if topicID, err = p.TopicID(topic); err != nil {
+		return err
+	}
+
 	logFields := make(watermill.LogFields, 4)
 	logFields["topic"] = topic
+	logFields["topicID"] = topicID
 
 	for _, message := range messages {
 		logFields["message_uuid"] = message.UUID
@@ -105,7 +131,7 @@ func (p *Publisher) Publish(topic string, messages ...*message.Message) (err err
 		}
 
 		// TODO: wait for ack and log partition and offset (requires SDK update).
-		p.stream.Publish(event)
+		p.stream.Publish(topicID, event)
 
 		// NOTE: errors are not synchronous, e.g. this might not be the error for the
 		// currently sent message, it might be an error from a previous message that
@@ -140,4 +166,11 @@ func (p *Publisher) Close() (err error) {
 		return errors.Wrap(err, "cannot close ensign client")
 	}
 	return nil
+}
+
+func (p *Publisher) TopicID(topic string) (topicID string, err error) {
+	if p.config.EnsureCreateTopic {
+		return p.topics.Ensure(topic)
+	}
+	return p.topics.Get(topic)
 }

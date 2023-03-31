@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	ensign "github.com/rotationalio/go-ensign"
 	api "github.com/rotationalio/go-ensign/api/v1beta1"
+	"github.com/rotationalio/go-ensign/topics"
 
 	internalSync "github.com/ThreeDotsLabs/watermill/pubsub/sync"
 )
@@ -23,6 +24,7 @@ type Subscriber struct {
 	client  *ensign.Client
 	subs    []handler
 	closing chan struct{}
+	topics  *topics.Cache
 
 	outputsWg            sync.WaitGroup
 	processingMessagesWg sync.WaitGroup
@@ -33,6 +35,8 @@ var _ message.SubscribeInitializer = &Subscriber{}
 
 type SubscriberConfig struct {
 	// Ensign config is used to overwrite the Ensign connection configuration
+	// Supply Ensign API Key credentials directly in this configuration or set the
+	// $ENSIGN_CLIENT_ID and $ENSIGN_CLIENT_SECRET environment variables.
 	EnsignConfig *ensign.Options
 
 	// Specify a client directly rather than connecting via the config
@@ -48,6 +52,9 @@ type SubscriberConfig struct {
 	// CloseTimeout determines how long subscriber will wait for Ack/Nack on close.
 	// When no Ack/Nack is received after CloseTimeout, subscriber will be closed.
 	CloseTimeout time.Duration
+
+	// Create the topic if it doesn't exist when subscribing (default false).
+	EnsureCreateTopic bool
 }
 
 func (c *SubscriberConfig) setDefaults() {
@@ -62,6 +69,10 @@ func (c *SubscriberConfig) setDefaults() {
 	if c.AckWaitTimeout <= 0 {
 		c.AckWaitTimeout = time.Second * 30
 	}
+
+	if c.EnsignConfig == nil && c.Client == nil {
+		c.EnsignConfig = ensign.NewOptions()
+	}
 }
 
 func (c SubscriberConfig) Validate() error {
@@ -71,6 +82,12 @@ func (c SubscriberConfig) Validate() error {
 
 	if c.EnsignConfig != nil && c.Client != nil {
 		return ErrAmbiguousConfig
+	}
+
+	if c.EnsignConfig != nil {
+		if c.EnsignConfig.ClientID == "" || c.EnsignConfig.ClientSecret == "" {
+			return ErrMissingCredentials
+		}
 	}
 
 	return nil
@@ -95,6 +112,8 @@ func NewSubscriber(config SubscriberConfig, logger watermill.LoggerAdapter) (sub
 		}
 	}
 
+	sub.topics = topics.NewCache(sub.client)
+
 	if sub.logger == nil {
 		sub.logger = watermill.NopLogger{}
 	}
@@ -105,14 +124,18 @@ func NewSubscriber(config SubscriberConfig, logger watermill.LoggerAdapter) (sub
 // SubscribeInitialize satisfies one of Watermill's interfaces. It is not
 // necessary to manually call it. The same initialization performed by this
 // function is performed by subscribe.
-func (s *Subscriber) SubscribeInitialize(topic string) error {
-	// TODO: implement
+func (s *Subscriber) SubscribeInitialize(topic string) (err error) {
+	if topic == "" {
+		return ErrEmptyTopic
+	}
 	return nil
 }
 
+// Subscribe to topic.
 func (s *Subscriber) Subscribe(ctx context.Context, topic string) (_ <-chan *message.Message, err error) {
-	if topic == "" {
-		return nil, ErrEmptyTopic
+	var topicID string
+	if topicID, err = s.TopicID(topic); err != nil {
+		return nil, err
 	}
 
 	output := make(chan *message.Message)
@@ -120,11 +143,12 @@ func (s *Subscriber) Subscribe(ctx context.Context, topic string) (_ <-chan *mes
 		sub:  s,
 		outc: output,
 		logFields: watermill.LogFields{
-			"topic": topic,
+			"topic":   topic,
+			"topicID": topicID,
 		},
 	}
 
-	if handler.stream, err = s.client.Subscribe(ctx); err != nil {
+	if handler.stream, err = s.client.Subscribe(ctx, topicID); err != nil {
 		return nil, errors.Wrapf(err, "cannot subscribe to topic %q", err)
 	}
 
@@ -171,6 +195,13 @@ func (s *Subscriber) isClosed() bool {
 	s.RLock()
 	defer s.RUnlock()
 	return s.client == nil
+}
+
+func (s *Subscriber) TopicID(topic string) (topicID string, err error) {
+	if s.config.EnsureCreateTopic {
+		return s.topics.Ensure(topic)
+	}
+	return s.topics.Get(topic)
 }
 
 type handler struct {
