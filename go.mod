@@ -6,13 +6,15 @@ require (
 	github.com/ThreeDotsLabs/watermill v1.2.0
 	github.com/google/uuid v1.3.0
 	github.com/pkg/errors v0.9.1
-	github.com/rotationalio/go-ensign v0.5.2-0.20230329215109-1db6c9a1ec1c
+	github.com/rotationalio/go-ensign v0.6.0
 	github.com/stretchr/testify v1.8.2
 	google.golang.org/protobuf v1.30.0
 )
 
 require (
+	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
