@@ -20,13 +20,7 @@ const (
 	TypeNameKey    = "type_name"
 	TypeVersionKey = "type_version"
 	KeyKey         = "key"
-	EncAlgKey      = "encryption_algorithm"
-	EncKeyIDKey    = "encryption_key_id"
-	CompressAlgKey = "compression_algorithm"
-	RegionNameKey  = "region_name"
-	PubClientIDKey = "publisher_client_id"
-	PubIPAddrKey   = "publisher_ipaddr"
-	UUIDKey        = "user_defined_id"
+	UUIDKey        = "local_id"
 	CreatedKey     = "created"
 	CommittedKey   = "committed"
 )
@@ -74,13 +68,8 @@ func (e EventMarshaler) Marshal(topic string, msg *message.Message) (event *pb.E
 
 	// TODO: how to add topic ID to the event from the topic string (or validate it)?
 	event = &pb.Event{
-		Data:          msg.Payload,
-		UserDefinedId: msg.UUID,
-	}
-
-	if value := msg.Metadata.Get(KeyKey); value != "" {
-		// TODO: should we add base64 encoding/decoding to the key?
-		event.Key = []byte(value)
+		Data:     msg.Payload,
+		Metadata: msg.Metadata,
 	}
 
 	if value := msg.Metadata.Get(MIMEKey); value != "" {
@@ -99,33 +88,7 @@ func (e EventMarshaler) Marshal(topic string, msg *message.Message) (event *pb.E
 			if version, err = strconv.ParseUint(vers, 10, 32); err != nil {
 				return nil, fmt.Errorf("could not parse type version: %w", err)
 			}
-			event.Type.Version = uint32(version)
-		}
-	}
-
-	if enc := msg.Metadata.Get(EncKeyIDKey); enc != "" {
-		event.Encryption = &pb.Encryption{
-			Algorithm: msg.Metadata.Get(EncAlgKey),
-			KeyId:     enc,
-		}
-	}
-
-	if cmp := msg.Metadata.Get(CompressAlgKey); cmp != "" {
-		event.Compression = &pb.Compression{
-			Algorithm: cmp,
-		}
-	}
-
-	if region := msg.Metadata.Get(RegionNameKey); region != "" {
-		event.Geography = &pb.Region{
-			Name: region,
-		}
-	}
-
-	if pub := msg.Metadata.Get(PubClientIDKey); pub != "" {
-		event.Publisher = &pb.Publisher{
-			ClientId: pub,
-			Ipaddr:   msg.Metadata.Get(PubIPAddrKey),
+			event.Type.MajorVersion = uint32(version)
 		}
 	}
 
@@ -143,48 +106,18 @@ func (e EventMarshaler) Marshal(topic string, msg *message.Message) (event *pb.E
 func (e EventMarshaler) Unmarshal(event *pb.Event) (*message.Message, error) {
 	// Create metadata from ensign event headers
 	metadata := make(message.Metadata, nEnsignKeys)
-	metadata.Set(IDKey, event.Id)
-	metadata.Set(TopicIDKey, event.TopicId)
 	metadata.Set(MIMEKey, event.Mimetype.MimeType())
-
-	if event.Key != nil {
-		// TODO: should we add base64 encoding to the key?
-		metadata.Set(KeyKey, string(event.Key))
-	}
 
 	if event.Type != nil {
 		metadata.Set(TypeNameKey, event.Type.Name)
-		metadata.Set(TypeVersionKey, strconv.FormatUint(uint64(event.Type.Version), 10))
-	}
-
-	if event.Encryption != nil {
-		metadata.Set(EncAlgKey, event.Encryption.Algorithm)
-		metadata.Set(EncKeyIDKey, event.Encryption.KeyId)
-	}
-
-	if event.Compression != nil {
-		metadata.Set(CompressAlgKey, event.Compression.Algorithm)
-	}
-
-	if event.Geography != nil {
-		metadata.Set(RegionNameKey, event.Geography.Name)
-	}
-
-	if event.Publisher != nil {
-		metadata.Set(PubClientIDKey, event.Publisher.ClientId)
-		metadata.Set(PubIPAddrKey, event.Publisher.Ipaddr)
+		metadata.Set(TypeVersionKey, strconv.FormatUint(uint64(event.Type.MajorVersion), 10))
 	}
 
 	if event.Created != nil {
 		metadata.Set(CreatedKey, event.Created.AsTime().Format(time.RFC3339Nano))
 	}
 
-	if event.Committed != nil {
-		metadata.Set(CommittedKey, event.Committed.AsTime().Format(time.RFC3339Nano))
-	}
-
 	msg := message.NewMessage(event.UserDefinedId, event.Data)
 	msg.Metadata = metadata
-
 	return msg, nil
 }
