@@ -1,0 +1,15 @@
+{
+  "mimetype":  "APPLICATION_JSON",
+  "type":  {
+    "name":  "TestEvent",
+    "major_version":  1,
+    "minor_version":  3,
+    "patch_version":  0
+  },
+  "metadata": {
+    "color": "red",
+    "group": "xchange"
+  },
+  "data":  "eyJhZ2UiOjQyLCJjb2xvciI6InJlZCJ9",
+  "created":  "2022-11-02T22:21:39.804188Z"
+}

@@ -71,7 +71,9 @@ func (c *SubscriberConfig) setDefaults() {
 	}
 
 	if c.EnsignConfig == nil && c.Client == nil {
-		c.EnsignConfig = ensign.NewOptions()
+		// Ignore any validation errors until the Validate() step in the config
+		opts, _ := ensign.NewOptions()
+		c.EnsignConfig = &opts
 	}
 }
 
@@ -87,6 +89,11 @@ func (c SubscriberConfig) Validate() error {
 	if c.EnsignConfig != nil {
 		if c.EnsignConfig.ClientID == "" || c.EnsignConfig.ClientSecret == "" {
 			return ErrMissingCredentials
+		}
+
+		// Validate other ensign configuration issues
+		if err := c.EnsignConfig.Validate(); err != nil {
+			return err
 		}
 	}
 
@@ -107,7 +114,7 @@ func NewSubscriber(config SubscriberConfig, logger watermill.LoggerAdapter) (sub
 	}
 
 	if sub.client == nil {
-		if sub.client, err = ensign.New(config.EnsignConfig); err != nil {
+		if sub.client, err = ensign.New(ensign.WithOptions(*config.EnsignConfig)); err != nil {
 			return nil, errors.Wrap(err, "could not connect to ensign")
 		}
 	}
@@ -148,17 +155,12 @@ func (s *Subscriber) Subscribe(ctx context.Context, topic string) (_ <-chan *mes
 		},
 	}
 
-	if handler.stream, err = s.client.Subscribe(ctx, topicID); err != nil {
-		return nil, errors.Wrapf(err, "cannot subscribe to topic %q", err)
-	}
-
-	var events <-chan *api.Event
-	if events, err = handler.stream.Subscribe(); err != nil {
+	if handler.stream, err = s.client.Subscribe(topicID); err != nil {
 		return nil, errors.Wrapf(err, "cannot subscribe to topic %q", err)
 	}
 
 	s.outputsWg.Add(1)
-	go handler.run(ctx, events)
+	go handler.run(ctx, handler.stream.C)
 
 	s.Lock()
 	s.subs = append(s.subs, handler)
@@ -206,12 +208,12 @@ func (s *Subscriber) TopicID(topic string) (topicID string, err error) {
 
 type handler struct {
 	sub       *Subscriber
-	stream    ensign.Subscriber
+	stream    *ensign.Subscription
 	outc      chan<- *message.Message
 	logFields watermill.LogFields
 }
 
-func (s handler) run(ctx context.Context, events <-chan *api.Event) {
+func (s handler) run(ctx context.Context, events <-chan *ensign.Event) {
 msgs:
 	for {
 		select {
@@ -232,13 +234,8 @@ msgs:
 	s.sub.outputsWg.Done()
 }
 
-func (s handler) process(ctx context.Context, event *api.Event) {
+func (s handler) process(ctx context.Context, event *ensign.Event) {
 	if s.sub.isClosed() {
-		return
-	}
-
-	if err := s.stream.Err(); err != nil {
-		s.sub.logger.Error("ensign subscription stream errored", err, s.logFields)
 		return
 	}
 
@@ -273,14 +270,14 @@ func (s handler) process(ctx context.Context, event *api.Event) {
 
 	select {
 	case <-msg.Acked():
-		if err := s.stream.Ack(event.Id); err != nil {
+		if _, err := event.Ack(); err != nil {
 			s.sub.logger.Error("cannot send ack", err, messageFields)
 			return
 		}
 		s.sub.logger.Trace("message acked", messageFields)
 		return
 	case <-msg.Nacked():
-		if err := s.stream.Nack(event.Id, nil); err != nil {
+		if _, err := event.Nack(api.Nack_UNPROCESSED); err != nil {
 			s.sub.logger.Error("cannot send nack", err, messageFields)
 			return
 		}

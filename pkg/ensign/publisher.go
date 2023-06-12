@@ -1,14 +1,12 @@
 package ensign
 
 import (
-	"context"
 	"sync"
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/pkg/errors"
 	ensign "github.com/rotationalio/go-ensign"
-	api "github.com/rotationalio/go-ensign/api/v1beta1"
 	"github.com/rotationalio/go-ensign/topics"
 )
 
@@ -19,7 +17,6 @@ type Publisher struct {
 	logger watermill.LoggerAdapter
 
 	client *ensign.Client
-	stream ensign.Publisher
 	topics *topics.Cache
 }
 
@@ -48,7 +45,9 @@ func (c *PublisherConfig) setDefaults() {
 	}
 
 	if c.EnsignConfig == nil && c.Client == nil {
-		c.EnsignConfig = ensign.NewOptions()
+		// Ignore any validation errors until the Validate() step in the config
+		opts, _ := ensign.NewOptions()
+		c.EnsignConfig = &opts
 	}
 }
 
@@ -64,6 +63,11 @@ func (c PublisherConfig) Validate() error {
 	if c.EnsignConfig != nil {
 		if c.EnsignConfig.ClientID == "" || c.EnsignConfig.ClientSecret == "" {
 			return ErrMissingCredentials
+		}
+
+		// Validate other ensign configuration issues
+		if err := c.EnsignConfig.Validate(); err != nil {
+			return err
 		}
 	}
 
@@ -83,17 +87,12 @@ func NewPublisher(config PublisherConfig, logger watermill.LoggerAdapter) (pub *
 	}
 
 	if pub.client == nil {
-		if pub.client, err = ensign.New(config.EnsignConfig); err != nil {
+		if pub.client, err = ensign.New(ensign.WithOptions(*pub.config.EnsignConfig)); err != nil {
 			return nil, errors.Wrap(err, "could not connect to ensign")
 		}
 	}
 
 	pub.topics = topics.NewCache(pub.client)
-
-	if pub.stream, err = pub.client.Publish(context.Background()); err != nil {
-		return nil, errors.Wrap(err, "cannot connect to topic stream")
-	}
-
 	if pub.logger == nil {
 		pub.logger = watermill.NopLogger{}
 	}
@@ -125,18 +124,13 @@ func (p *Publisher) Publish(topic string, messages ...*message.Message) (err err
 		logFields["message_uuid"] = message.UUID
 		p.logger.Trace("sending message to Ensign", logFields)
 
-		var event *api.Event
+		var event *ensign.Event
 		if event, err = p.config.Marshaler.Marshal(topic, message); err != nil {
 			return errors.Wrapf(err, "cannot marshal messages %s", message.UUID)
 		}
 
 		// TODO: wait for ack and log partition and offset (requires SDK update).
-		p.stream.Publish(topicID, event)
-
-		// NOTE: errors are not synchronous, e.g. this might not be the error for the
-		// currently sent message, it might be an error from a previous message that
-		// was sent. We have to change the Ensign SDK in order to get a sync error.
-		if err = p.stream.Err(); err != nil {
+		if err = p.client.Publish(topicID, event); err != nil {
 			return err
 		}
 
@@ -155,12 +149,7 @@ func (p *Publisher) Close() (err error) {
 
 	defer func() {
 		p.client = nil
-		p.stream = nil
 	}()
-
-	if err = p.stream.Close(); err != nil {
-		return errors.Wrap(err, "cannot close ensign stream")
-	}
 
 	if err = p.client.Close(); err != nil {
 		return errors.Wrap(err, "cannot close ensign client")
