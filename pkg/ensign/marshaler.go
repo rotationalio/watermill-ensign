@@ -1,34 +1,48 @@
 package ensign
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/ThreeDotsLabs/watermill/message"
+	api "github.com/rotationalio/go-ensign"
 	pb "github.com/rotationalio/go-ensign/api/v1beta1"
 	mime "github.com/rotationalio/go-ensign/mimetype/v1beta1"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	region "github.com/rotationalio/go-ensign/region/v1beta1"
 )
 
 // Header keys that the ensign marshaler expects to find in message metadata in order
 // to convert the Waterfall message into an Ensign event.
 const (
-	IDKey          = "id"
-	TopicIDKey     = "topic_id"
+	// Event Data
 	MIMEKey        = "mimetype"
 	TypeNameKey    = "type_name"
 	TypeVersionKey = "type_version"
-	KeyKey         = "key"
-	EncAlgKey      = "encryption_algorithm"
-	EncKeyIDKey    = "encryption_key_id"
-	CompressAlgKey = "compression_algorithm"
-	RegionNameKey  = "region_name"
-	PubClientIDKey = "publisher_client_id"
-	PubIPAddrKey   = "publisher_ipaddr"
-	UUIDKey        = "user_defined_id"
 	CreatedKey     = "created"
-	CommittedKey   = "committed"
+
+	// Watermill Parity
+	WatermillUUIDKey = "watermill_uuid"
+
+	// Event Info
+	IDKey                 = "event_id"
+	TopicIDKey            = "topic_id"
+	OffsetKey             = "offset"
+	EpochKey              = "epoch"
+	RegionKey             = "region"
+	PublisherIDKey        = "publisher_id"
+	PublisherIPAddrKey    = "publisher_ipaddr"
+	PublisherClientIDKey  = "publisher_client_id"
+	PublisherUserAgentKey = "publisher_user_agent"
+	KeyKey                = "key"
+	ShardKey              = "shard"
+	EncAlgKey             = "encryption_algorithm"
+	EncKeyIDKey           = "encryption_public_key_id"
+	EncSigKey             = "encryption_signature"
+	CompressAlgKey        = "compression_algorithm"
+	CompressLevelKey      = "compression_level"
+	CommittedKey          = "committed"
 )
 
 // The number of metadata keys available in Ensign (to alloc metadata)
@@ -36,17 +50,19 @@ const nEnsignKeys = 15
 
 // Reserved metadata keys that cannot be in a message for serialization.
 var reserved = []string{
-	IDKey, TopicIDKey, CommittedKey, UUIDKey,
+	IDKey, TopicIDKey, OffsetKey, EpochKey, WatermillUUIDKey,
+	RegionKey, PublisherIDKey, PublisherIPAddrKey,
+	EncAlgKey, EncSigKey, ShardKey, CommittedKey,
 }
 
 // Marshaler transforms a Waterfall Message into an Ensign client library Event.
 type Marshaler interface {
-	Marshal(topic string, msg *message.Message) (*pb.Event, error)
+	Marshal(topic string, msg *message.Message) (*api.Event, error)
 }
 
 // Unmarshaler transfers an Ensign client library Event into a Waterfall Message.
 type Unmarshaler interface {
-	Unmarshal(*pb.Event) (*message.Message, error)
+	Unmarshal(*api.Event) (*message.Message, error)
 }
 
 type MarshalerUnmarshaler interface {
@@ -64,7 +80,7 @@ var _ Marshaler = &EventMarshaler{}
 var _ Unmarshaler = &EventMarshaler{}
 var _ MarshalerUnmarshaler = &EventMarshaler{}
 
-func (e EventMarshaler) Marshal(topic string, msg *message.Message) (event *pb.Event, err error) {
+func (e EventMarshaler) Marshal(topic string, msg *message.Message) (event *api.Event, err error) {
 	// Check if any of the reserved keys have been specified in the message metadata
 	for _, reservedKey := range reserved {
 		if value := msg.Metadata.Get(reservedKey); value != "" {
@@ -73,15 +89,16 @@ func (e EventMarshaler) Marshal(topic string, msg *message.Message) (event *pb.E
 	}
 
 	// TODO: how to add topic ID to the event from the topic string (or validate it)?
-	event = &pb.Event{
-		Data:          msg.Payload,
-		UserDefinedId: msg.UUID,
+	event = &api.Event{
+		Data:     msg.Payload,
+		Metadata: make(api.Metadata, len(msg.Metadata)),
 	}
 
-	if value := msg.Metadata.Get(KeyKey); value != "" {
-		// TODO: should we add base64 encoding/decoding to the key?
-		event.Key = []byte(value)
+	for key, val := range msg.Metadata {
+		event.Metadata[key] = val
 	}
+
+	event.Metadata[WatermillUUIDKey] = msg.UUID
 
 	if value := msg.Metadata.Get(MIMEKey); value != "" {
 		if event.Mimetype, err = mime.Parse(value); err != nil {
@@ -95,37 +112,9 @@ func (e EventMarshaler) Marshal(topic string, msg *message.Message) (event *pb.E
 		}
 
 		if vers := msg.Metadata.Get(TypeVersionKey); vers != "" {
-			var version uint64
-			if version, err = strconv.ParseUint(vers, 10, 32); err != nil {
-				return nil, fmt.Errorf("could not parse type version: %w", err)
+			if err = event.Type.ParseSemver(vers); err != nil {
+				return nil, fmt.Errorf("could not parse metadata type version: %w", err)
 			}
-			event.Type.Version = uint32(version)
-		}
-	}
-
-	if enc := msg.Metadata.Get(EncKeyIDKey); enc != "" {
-		event.Encryption = &pb.Encryption{
-			Algorithm: msg.Metadata.Get(EncAlgKey),
-			KeyId:     enc,
-		}
-	}
-
-	if cmp := msg.Metadata.Get(CompressAlgKey); cmp != "" {
-		event.Compression = &pb.Compression{
-			Algorithm: cmp,
-		}
-	}
-
-	if region := msg.Metadata.Get(RegionNameKey); region != "" {
-		event.Geography = &pb.Region{
-			Name: region,
-		}
-	}
-
-	if pub := msg.Metadata.Get(PubClientIDKey); pub != "" {
-		event.Publisher = &pb.Publisher{
-			ClientId: pub,
-			Ipaddr:   msg.Metadata.Get(PubIPAddrKey),
 		}
 	}
 
@@ -134,57 +123,95 @@ func (e EventMarshaler) Marshal(topic string, msg *message.Message) (event *pb.E
 		if ts, err = time.Parse(time.RFC3339Nano, value); err != nil {
 			return nil, fmt.Errorf("could not parse created timestamp: %w", err)
 		}
-		event.Created = timestamppb.New(ts)
+		event.Created = ts
 	}
 
 	return event, nil
 }
 
-func (e EventMarshaler) Unmarshal(event *pb.Event) (*message.Message, error) {
+func (e EventMarshaler) Unmarshal(event *api.Event) (*message.Message, error) {
 	// Create metadata from ensign event headers
-	metadata := make(message.Metadata, nEnsignKeys)
-	metadata.Set(IDKey, event.Id)
-	metadata.Set(TopicIDKey, event.TopicId)
+	metadata := make(message.Metadata, nEnsignKeys+len(event.Metadata))
+	metadata.Set(IDKey, event.ID())
+	metadata.Set(TopicIDKey, event.TopicID())
 	metadata.Set(MIMEKey, event.Mimetype.MimeType())
 
-	if event.Key != nil {
-		// TODO: should we add base64 encoding to the key?
-		metadata.Set(KeyKey, string(event.Key))
-	}
-
+	// Set the event type with semantic version into the message metadata
 	if event.Type != nil {
 		metadata.Set(TypeNameKey, event.Type.Name)
-		metadata.Set(TypeVersionKey, strconv.FormatUint(uint64(event.Type.Version), 10))
+		metadata.Set(TypeVersionKey, event.Type.Semver())
 	}
 
-	if event.Encryption != nil {
-		metadata.Set(EncAlgKey, event.Encryption.Algorithm)
-		metadata.Set(EncKeyIDKey, event.Encryption.KeyId)
+	info := event.Info()
+	if info != nil {
+
+		metadata.Set(OffsetKey, strconv.FormatUint(info.Offset, 10))
+		metadata.Set(EpochKey, strconv.FormatUint(info.Epoch, 10))
+
+		if info.Region != region.Region_UNKNOWN {
+			metadata.Set(RegionKey, info.Region.String())
+		}
+
+		if info.Publisher != nil && info.Publisher.PublisherId != "" {
+			metadata.Set(PublisherIDKey, info.Publisher.PublisherId)
+			metadata.Set(PublisherIPAddrKey, info.Publisher.Ipaddr)
+
+			if info.Publisher.ClientId != "" {
+				metadata.Set(PublisherClientIDKey, info.Publisher.ClientId)
+			}
+
+			if info.Publisher.UserAgent != "" {
+				metadata.Set(PublisherUserAgentKey, info.Publisher.UserAgent)
+			}
+		}
+
+		if len(info.Key) > 0 {
+			// TODO: should we add base64 encoding to the key?
+			metadata.Set(KeyKey, string(info.Key))
+			metadata.Set(ShardKey, strconv.FormatUint(info.Shard, 16))
+		}
+
+		if info.Encryption != nil {
+			metadata.Set(EncAlgKey, info.Encryption.EncryptionAlgorithm.String())
+			metadata.Set(EncKeyIDKey, info.Encryption.PublicKeyId)
+			metadata.Set(EncSigKey, hex.EncodeToString(info.Encryption.Signature))
+		}
+
+		if info.Compression != nil {
+			metadata.Set(CompressAlgKey, info.Compression.Algorithm.String())
+			if info.Compression.Level > 0 {
+				metadata.Set(CompressLevelKey, strconv.FormatInt(info.Compression.Level, 10))
+			}
+		}
 	}
 
-	if event.Compression != nil {
-		metadata.Set(CompressAlgKey, event.Compression.Algorithm)
+	// Set the created and committed timestamps
+	if !event.Created.IsZero() {
+		metadata.Set(CreatedKey, event.Created.Format(time.RFC3339Nano))
 	}
 
-	if event.Geography != nil {
-		metadata.Set(RegionNameKey, event.Geography.Name)
+	if !event.Committed().IsZero() {
+		metadata.Set(CommittedKey, event.Committed().Format(time.RFC3339Nano))
 	}
 
-	if event.Publisher != nil {
-		metadata.Set(PubClientIDKey, event.Publisher.ClientId)
-		metadata.Set(PubIPAddrKey, event.Publisher.Ipaddr)
+	// Set the user metadata back onto the message.
+	// NOTE: user keys will override ensign metadata keys that are not reserved.
+	for key, val := range event.Metadata {
+		metadata.Set(key, val)
 	}
 
-	if event.Created != nil {
-		metadata.Set(CreatedKey, event.Created.AsTime().Format(time.RFC3339Nano))
+	// Attempt to determine the message UUID
+	var ok bool
+	var uuid string
+	if uuid, ok = event.Metadata[WatermillUUIDKey]; !ok {
+		if info := event.Info(); info != nil {
+			uuid = string(info.LocalId)
+		}
 	}
 
-	if event.Committed != nil {
-		metadata.Set(CommittedKey, event.Committed.AsTime().Format(time.RFC3339Nano))
-	}
-
-	msg := message.NewMessage(event.UserDefinedId, event.Data)
+	msg := message.NewMessage(uuid, event.Data)
 	msg.Metadata = metadata
+	delete(msg.Metadata, WatermillUUIDKey)
 
 	return msg, nil
 }

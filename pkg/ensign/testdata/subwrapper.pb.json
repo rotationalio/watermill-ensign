@@ -1,0 +1,30 @@
+{
+  "id":  "AYQ6b4xcAAAAhA==",
+  "topic_id":  "AYixsUax1rQkqydkknwV4A==",
+  "offset": 421332,
+  "epoch": 214,
+  "region": "LKE_US_SOUTHEAST_1A",
+  "publisher":  {
+    "publisher_id": "01H2RVFTTKBY59KNVJZ0A0MJEF",
+    "ipaddr":  "127.0.0.1",
+    "client_id":  "1234abcdef",
+    "user_agent": "PyEnsign v1.0"
+  },
+  "key": "cGFydGl0aW9uMQ==",
+  "shard": 0,
+  "encryption":  {
+    "public_key_id": "676c64a5-44f0-4e11-a8a7-52fdb30b4caa",
+    "encryption_key": "G87XpQuKA+wsC8M5DgFC6WKqANChA6cK0TYVWnAzNEU=",
+    "hmac_secret": "SmzUErl86WpOoUoSmNAU4r4MY4N66JrR8L9HIVbifYM=",
+    "signature": "tWoyqvssqJXPyvwkFH3q0w==",
+    "sealing_algorithm": "RSA_OAEP_SHA512",
+    "encryption_algorithm": "AES256_GCM",
+    "signature_algorithm": "HMAC_SHA256"
+  },
+  "compression":  {
+    "algorithm":  "GZIP",
+    "level": 6
+  },
+  "local_id": "AYiwz9pmsr/SteF5FHOF0A==",
+  "committed":  "2022-11-03T07:08:01.804626Z"
+}
